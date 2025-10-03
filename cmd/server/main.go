@@ -3,12 +3,10 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/util"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -21,7 +19,7 @@ func main() {
 }
 
 func do() error {
-	fmt.Println("Starting Peril server...")
+	log.Println("Starting Peril server...")
 
 	conn, err := amqp.Dial(connectionString)
 	if err != nil {
@@ -29,7 +27,7 @@ func do() error {
 	}
 	defer conn.Close()
 
-	fmt.Println("Successfully connected!")
+	log.Println("Successfully connected!")
 
 	ch, err := conn.Channel()
 	if err != nil {
@@ -43,13 +41,9 @@ func do() error {
 		return fmt.Errorf("publishing initial pause state: %w", err)
 	}
 
-	// Wait for a signal to exit
-	fmt.Println("Press Ctrl+C to exit")
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
-	<-sigs
+	util.WaitForSignal()
 
-	fmt.Println("\nShutting down and closing the connection...")
+	log.Println("Shutting down and closing the connection...")
 
 	return nil
 }
