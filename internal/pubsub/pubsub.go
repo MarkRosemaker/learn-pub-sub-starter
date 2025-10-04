@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json/v2"
 	"fmt"
+	"log"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -52,8 +53,16 @@ func DeclareAndBind(conn *amqp.Connection,
 	return ch, q, nil
 }
 
+type AckType int
+
+const (
+	Ack AckType = iota
+	NackRequeue
+	NackDiscard
+)
+
 func SubscribeJSON[T any](conn *amqp.Connection,
-	exchange, queueName, key string, queueType SimpleQueueType, handler func(T),
+	exchange, queueName, key string, queueType SimpleQueueType, handler func(T) AckType,
 ) error {
 	ch, q, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
@@ -74,10 +83,17 @@ func SubscribeJSON[T any](conn *amqp.Connection,
 			}
 
 			// Handle the unmarshaled message
-			handler(msg)
-
-			// Acknowledge the message
-			delivery.Ack(false)
+			switch handler(msg) {
+			case Ack: // Acknowledge the message
+				log.Printf("acknowledging %T", msg)
+				delivery.Ack(false)
+			case NackRequeue:
+				log.Printf("nack and requeue %T", msg)
+				delivery.Nack(false, true)
+			case NackDiscard:
+				log.Printf("nack and discard %T", msg)
+				delivery.Nack(false, false)
+			}
 		}
 	}()
 
