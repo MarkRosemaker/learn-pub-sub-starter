@@ -29,6 +29,12 @@ func do() error {
 
 	log.Println("Successfully connected!")
 
+	if _, _, err := pubsub.DeclareAndBind(conn, routing.ExchangePerilTopic,
+		routing.GameLogSlug, routing.GameLogSlug+".*", pubsub.SimpleQueueTypeDurable,
+	); err != nil {
+		return err
+	}
+
 	gamelogic.PrintServerHelp()
 
 	ch, err := conn.Channel()

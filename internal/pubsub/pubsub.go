@@ -38,7 +38,6 @@ func DeclareAndBind(conn *amqp.Connection,
 	if err != nil {
 		return nil, amqp.Queue{}, fmt.Errorf("getting channel: %w", err)
 	}
-	defer ch.Close()
 
 	isTransient := queueType == SimpleQueueTypeTransient
 	q, err := ch.QueueDeclare(queueName, !isTransient, isTransient, isTransient, false, nil)
@@ -51,4 +50,36 @@ func DeclareAndBind(conn *amqp.Connection,
 	}
 
 	return ch, q, nil
+}
+
+func SubscribeJSON[T any](conn *amqp.Connection,
+	exchange, queueName, key string, queueType SimpleQueueType, handler func(T),
+) error {
+	ch, q, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
+	if err != nil {
+		return err
+	}
+
+	deliveries, err := ch.Consume(q.Name, "", false, false, false, false, nil)
+	if err != nil {
+		return fmt.Errorf("consuming %q: %w", q.Name, err)
+	}
+
+	go func() {
+		for delivery := range deliveries {
+			// Unmarshal the body of each message delivery into T
+			var msg T
+			if err := json.Unmarshal(delivery.Body, &msg); err != nil {
+				panic(fmt.Errorf("unmarshaling delivery into %T: %w", msg, err))
+			}
+
+			// Handle the unmarshaled message
+			handler(msg)
+
+			// Acknowledge the message
+			delivery.Ack(false)
+		}
+	}()
+
+	return nil
 }

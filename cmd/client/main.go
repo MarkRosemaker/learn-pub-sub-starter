@@ -36,21 +36,18 @@ func do() error {
 		return fmt.Errorf("welcoming client: %w", err)
 	}
 
-	log.Printf("client %q welcomed", username)
+	gs := gamelogic.NewGameState(username)
 
-	queueName := fmt.Sprintf("%s.%s", routing.PauseKey, username)
-	if _, _, err := pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect,
-		queueName, routing.PauseKey, pubsub.SimpleQueueTypeTransient,
-	); err != nil {
-		return err
+	if err := pubsub.SubscribeJSON(conn,
+		routing.ExchangePerilDirect,
+		fmt.Sprintf("%s.%s", routing.PauseKey, gs.GetUsername()),
+		routing.PauseKey,
+		pubsub.SimpleQueueTypeTransient, handlerPause(gs)); err != nil {
+		return fmt.Errorf("subscribing to pause state: %w", err)
 	}
 
-	log.Printf("queue %q declared and bound", queueName)
-
-	state := gamelogic.NewGameState(username)
-
 	for {
-		if err := gameLoop(state); err != nil {
+		if err := gameLoop(gs); err != nil {
 			fmt.Printf("ERROR: %v\n", err)
 			continue
 		}
@@ -62,7 +59,7 @@ func do() error {
 	return nil
 }
 
-func gameLoop(state *gamelogic.GameState) error {
+func gameLoop(gs *gamelogic.GameState) error {
 	for {
 		words := gamelogic.GetInput()
 		if len(words) == 0 {
@@ -71,18 +68,18 @@ func gameLoop(state *gamelogic.GameState) error {
 
 		switch words[0] {
 		case "spawn":
-			if err := state.CommandSpawn(words); err != nil {
+			if err := gs.CommandSpawn(words); err != nil {
 				return fmt.Errorf("spawning: %w", err)
 			}
 		case "move":
-			move, err := state.CommandMove(words)
+			move, err := gs.CommandMove(words)
 			if err != nil {
 				return fmt.Errorf("moving: %w", err)
 			}
 
 			fmt.Printf("Move successful: %v\n", move)
 		case "status":
-			state.CommandStatus()
+			gs.CommandStatus()
 		default:
 			fmt.Printf("Command %q unknown\n", words[0])
 			fallthrough
