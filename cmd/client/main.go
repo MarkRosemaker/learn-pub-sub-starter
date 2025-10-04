@@ -7,7 +7,6 @@ import (
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/util"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -48,9 +47,52 @@ func do() error {
 
 	log.Printf("queue %q declared and bound", queueName)
 
-	util.WaitForSignal()
+	state := gamelogic.NewGameState(username)
+
+	for {
+		if err := gameLoop(state); err != nil {
+			fmt.Printf("ERROR: %v\n", err)
+			continue
+		}
+
+		break
+	}
 
 	log.Println("Shutting down and closing the connection...")
-
 	return nil
+}
+
+func gameLoop(state *gamelogic.GameState) error {
+	for {
+		words := gamelogic.GetInput()
+		if len(words) == 0 {
+			continue
+		}
+
+		switch words[0] {
+		case "spawn":
+			if err := state.CommandSpawn(words); err != nil {
+				return fmt.Errorf("spawning: %w", err)
+			}
+		case "move":
+			move, err := state.CommandMove(words)
+			if err != nil {
+				return fmt.Errorf("moving: %w", err)
+			}
+
+			fmt.Printf("Move successful: %v\n", move)
+		case "status":
+			state.CommandStatus()
+		default:
+			fmt.Printf("Command %q unknown\n", words[0])
+			fallthrough
+		case "help":
+			gamelogic.PrintClientHelp()
+		case "spam":
+			fmt.Println("Spamming not allowed yet!")
+		case "quit":
+			gamelogic.PrintQuit()
+			return nil
+		}
+	}
 }

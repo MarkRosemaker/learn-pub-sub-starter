@@ -6,7 +6,7 @@ import (
 )
 
 func (gs *GameState) CommandSpawn(words []string) error {
-	if len(words) < 3 {
+	if len(words) != 3 {
 		return errors.New("usage: spawn <location> <rank>")
 	}
 
