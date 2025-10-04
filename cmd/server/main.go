@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/util"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -29,21 +29,50 @@ func do() error {
 
 	log.Println("Successfully connected!")
 
+	gamelogic.PrintServerHelp()
+
 	ch, err := conn.Channel()
 	if err != nil {
 		return fmt.Errorf("getting channel: %w", err)
 	}
 	defer ch.Close()
 
-	if err := pubsub.PublishJSON(ch,
-		routing.ExchangePerilDirect, routing.PauseKey,
-		routing.PlayingState{IsPaused: true}); err != nil {
-		return fmt.Errorf("publishing initial pause state: %w", err)
+	if err := gameLoop(ch); err != nil {
+		return err
 	}
-
-	util.WaitForSignal()
 
 	log.Println("Shutting down and closing the connection...")
 
 	return nil
+}
+
+func gameLoop(ch *amqp.Channel) error {
+	for {
+		words := gamelogic.GetInput()
+		if len(words) == 0 {
+			continue
+		}
+
+		switch words[0] {
+		case "pause":
+			log.Println("pausing the game")
+			if err := pubsub.PublishJSON(ch,
+				routing.ExchangePerilDirect, routing.PauseKey,
+				routing.PlayingState{IsPaused: true}); err != nil {
+				return fmt.Errorf("publishing pause state: %w", err)
+			}
+		case "resume":
+			log.Println("resuming game")
+			if err := pubsub.PublishJSON(ch,
+				routing.ExchangePerilDirect, routing.PauseKey,
+				routing.PlayingState{IsPaused: false}); err != nil {
+				return fmt.Errorf("publishing resume state: %w", err)
+			}
+		case "quit":
+			log.Println("exiting")
+			return nil
+		default:
+			log.Printf("unknown command %q", words[0])
+		}
+	}
 }
