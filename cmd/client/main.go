@@ -39,15 +39,29 @@ func do() error {
 	gs := gamelogic.NewGameState(username)
 
 	if err := pubsub.SubscribeJSON(conn,
-		routing.ExchangePerilDirect,
-		fmt.Sprintf("%s.%s", routing.PauseKey, gs.GetUsername()),
-		routing.PauseKey,
+		routing.ExchangePerilDirect,                              // exchange
+		fmt.Sprintf("%s.%s", routing.PauseKey, gs.GetUsername()), // queue name
+		routing.PauseKey,                                         // key
 		pubsub.SimpleQueueTypeTransient, handlerPause(gs)); err != nil {
-		return fmt.Errorf("subscribing to pause state: %w", err)
+		return fmt.Errorf("subscribing to pause: %w", err)
 	}
 
+	if err := pubsub.SubscribeJSON(conn,
+		routing.ExchangePerilTopic,                                      // exchange
+		fmt.Sprintf("%s.%s", routing.ArmyMovesPrefix, gs.GetUsername()), // queue name
+		fmt.Sprintf("%s.*", routing.ArmyMovesPrefix),                    // key
+		pubsub.SimpleQueueTypeTransient, handlerMove(gs)); err != nil {
+		return fmt.Errorf("subscribing to move: %w", err)
+	}
+
+	ch, err := conn.Channel()
+	if err != nil {
+		return fmt.Errorf("getting channel: %w", err)
+	}
+	defer ch.Close()
+
 	for {
-		if err := gameLoop(gs); err != nil {
+		if err := gameLoop(ch, gs); err != nil {
 			fmt.Printf("ERROR: %v\n", err)
 			continue
 		}
@@ -59,7 +73,7 @@ func do() error {
 	return nil
 }
 
-func gameLoop(gs *gamelogic.GameState) error {
+func gameLoop(ch *amqp.Channel, gs *gamelogic.GameState) error {
 	for {
 		words := gamelogic.GetInput()
 		if len(words) == 0 {
@@ -75,6 +89,14 @@ func gameLoop(gs *gamelogic.GameState) error {
 			move, err := gs.CommandMove(words)
 			if err != nil {
 				return fmt.Errorf("moving: %w", err)
+			}
+
+			if err := pubsub.PublishJSON(ch,
+				routing.ExchangePerilTopic,
+				fmt.Sprintf("%s.%s", routing.ArmyMovesPrefix, gs.GetUsername()),
+				move,
+			); err != nil {
+				return fmt.Errorf("publishing move: %w", err)
 			}
 
 			fmt.Printf("Move successful: %v\n", move)
