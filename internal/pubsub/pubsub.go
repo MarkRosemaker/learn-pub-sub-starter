@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -41,7 +42,11 @@ func DeclareAndBind(conn *amqp.Connection,
 	}
 
 	isTransient := queueType == SimpleQueueTypeTransient
-	q, err := ch.QueueDeclare(queueName, !isTransient, isTransient, isTransient, false, nil)
+	q, err := ch.QueueDeclare(queueName, !isTransient, isTransient, isTransient, false,
+		amqp.Table{
+			// This will tell RabbitMQ to send failed messages to the dead letter exchange.
+			"x-dead-letter-exchange": routing.ExchangePerilDL,
+		})
 	if err != nil {
 		return ch, amqp.Queue{}, fmt.Errorf("declaring queue: %w", err)
 	}

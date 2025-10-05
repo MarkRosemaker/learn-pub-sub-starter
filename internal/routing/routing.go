@@ -14,4 +14,5 @@ const (
 	// These are names of an exchanges I created at http://localhost:15672/#/exchanges
 	ExchangePerilDirect = "peril_direct"
 	ExchangePerilTopic  = "peril_topic"
+	ExchangePerilDL     = "peril_dlx"
 )
