@@ -7,6 +7,7 @@ import (
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/util"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -29,7 +30,11 @@ func do() error {
 	}
 	defer conn.Close()
 
-	log.Println("Successfully connected!")
+	publishCh, err := conn.Channel()
+	if err != nil {
+		return fmt.Errorf("getting channel: %w", err)
+	}
+	defer publishCh.Close()
 
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {
@@ -39,29 +44,37 @@ func do() error {
 	gs := gamelogic.NewGameState(username)
 
 	if err := pubsub.SubscribeJSON(conn,
-		routing.ExchangePerilDirect,                              // exchange
-		fmt.Sprintf("%s.%s", routing.PauseKey, gs.GetUsername()), // queue name
-		routing.PauseKey,                                         // key
-		pubsub.SimpleQueueTypeTransient, handlerPause(gs)); err != nil {
-		return fmt.Errorf("subscribing to pause: %w", err)
+		routing.ExchangePerilTopic,                              // exchange
+		util.DotJoin(routing.ArmyMovesPrefix, gs.GetUsername()), // queue name
+		util.DotJoin(routing.ArmyMovesPrefix, util.Asterisk),    // key
+		pubsub.SimpleQueueTypeTransient,
+		handlerMove(gs, publishCh),
+	); err != nil {
+		return fmt.Errorf("subscribing to moves: %w", err)
 	}
 
 	if err := pubsub.SubscribeJSON(conn,
-		routing.ExchangePerilTopic,                                      // exchange
-		fmt.Sprintf("%s.%s", routing.ArmyMovesPrefix, gs.GetUsername()), // queue name
-		fmt.Sprintf("%s.*", routing.ArmyMovesPrefix),                    // key
-		pubsub.SimpleQueueTypeTransient, handlerMove(gs)); err != nil {
-		return fmt.Errorf("subscribing to move: %w", err)
+		routing.ExchangePerilTopic,                                 // exchange
+		routing.WarRecognitionsPrefix,                              // queue name
+		util.DotJoin(routing.WarRecognitionsPrefix, util.Asterisk), // key
+		pubsub.SimpleQueueTypeDurable,
+		handlerRecognitionOfWar(gs),
+	); err != nil {
+		return fmt.Errorf("subscribing to war recognitions: %w", err)
 	}
 
-	ch, err := conn.Channel()
-	if err != nil {
-		return fmt.Errorf("getting channel: %w", err)
+	if err := pubsub.SubscribeJSON(conn,
+		routing.ExchangePerilDirect,                      // exchange
+		util.DotJoin(routing.PauseKey, gs.GetUsername()), // queue name
+		routing.PauseKey,                                 // key
+		pubsub.SimpleQueueTypeTransient,
+		handlerPause(gs),
+	); err != nil {
+		return fmt.Errorf("subscribing to pauses: %w", err)
 	}
-	defer ch.Close()
 
 	for {
-		if err := gameLoop(ch, gs); err != nil {
+		if err := gameLoop(publishCh, gs); err != nil {
 			fmt.Printf("ERROR: %v\n", err)
 			continue
 		}
@@ -86,20 +99,20 @@ func gameLoop(ch *amqp.Channel, gs *gamelogic.GameState) error {
 				return fmt.Errorf("spawning: %w", err)
 			}
 		case "move":
-			move, err := gs.CommandMove(words)
+			mv, err := gs.CommandMove(words)
 			if err != nil {
 				return fmt.Errorf("moving: %w", err)
 			}
 
 			if err := pubsub.PublishJSON(ch,
 				routing.ExchangePerilTopic,
-				fmt.Sprintf("%s.%s", routing.ArmyMovesPrefix, gs.GetUsername()),
-				move,
+				util.DotJoin(routing.ArmyMovesPrefix, gs.GetUsername()),
+				mv,
 			); err != nil {
 				return fmt.Errorf("publishing move: %w", err)
 			}
 
-			fmt.Printf("Move successful: %v\n", move)
+			fmt.Printf("Moved %v units to %s\n", len(mv.Units), mv.ToLocation)
 		case "status":
 			gs.CommandStatus()
 		default:

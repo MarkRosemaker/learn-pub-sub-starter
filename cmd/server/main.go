@@ -7,6 +7,7 @@ import (
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/util"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -29,21 +30,24 @@ func do() error {
 
 	log.Println("Successfully connected!")
 
-	if _, _, err := pubsub.DeclareAndBind(conn, routing.ExchangePerilTopic,
-		routing.GameLogSlug, routing.GameLogSlug+".*", pubsub.SimpleQueueTypeDurable,
+	publishCh, err := conn.Channel()
+	if err != nil {
+		return fmt.Errorf("getting channel: %w", err)
+	}
+	defer publishCh.Close()
+
+	if _, _, err := pubsub.DeclareAndBind(conn,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		util.DotJoin(routing.GameLogSlug, util.Asterisk),
+		pubsub.SimpleQueueTypeDurable,
 	); err != nil {
-		return err
+		return fmt.Errorf("%s: %w", routing.GameLogSlug, err)
 	}
 
 	gamelogic.PrintServerHelp()
 
-	ch, err := conn.Channel()
-	if err != nil {
-		return fmt.Errorf("getting channel: %w", err)
-	}
-	defer ch.Close()
-
-	if err := gameLoop(ch); err != nil {
+	if err := gameLoop(publishCh); err != nil {
 		return err
 	}
 
