@@ -35,12 +35,11 @@ func handlerMove(gs *gamelogic.GameState, publishCh *amqp.Channel) func(gamelogi
 					Defender: gs.GetPlayerSnap(),
 				},
 			); err != nil {
-				log.Printf("ERROR: %v", err)
-				// NackRequeue
+				log.Printf("ERROR: %v, requeuing %T", err, move)
+				return pubsub.NackRequeue
 			}
 
-			// NackRequeue the message... Might seem crazy, but it will be fun.
-			return pubsub.NackRequeue
+			return pubsub.Ack
 		default:
 			log.Printf("ERROR: unknown move outcome %v", moveOutcome)
 			return pubsub.NackDiscard
