@@ -1,10 +1,16 @@
-package gob
+package pubsub
 
 import (
 	"fmt"
 	"testing"
 	"time"
 )
+
+type GameLog struct {
+	CurrentTime time.Time
+	Message     string
+	Username    string
+}
 
 func Test(t *testing.T) {
 	type testCase struct {
@@ -43,12 +49,12 @@ func Test(t *testing.T) {
 
 	var passed, failed int
 	for _, test := range testCases {
-		encoded, err := encode(test.gamelog)
+		encoded, err := encodeGob(test.gamelog)
 		if err != nil {
 			t.Fatalf("encode failed: %v", err)
 		}
 		encodedHex := fmt.Sprintf("%x", encoded)
-		decoded, err := decode(encoded)
+		decoded, err := decode[GameLog](encoded)
 		if err != nil {
 			t.Fatalf("decode failed: %v", err)
 		}
