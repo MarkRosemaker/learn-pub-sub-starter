@@ -58,7 +58,7 @@ func do() error {
 		routing.WarRecognitionsPrefix,                              // queue name
 		util.DotJoin(routing.WarRecognitionsPrefix, util.Asterisk), // key
 		pubsub.SimpleQueueTypeDurable,
-		handlerRecognitionOfWar(gs),
+		handlerWar(gs, publishCh),
 	); err != nil {
 		return fmt.Errorf("subscribing to war recognitions: %w", err)
 	}
