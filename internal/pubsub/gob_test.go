@@ -42,7 +42,7 @@ func Test(t *testing.T) {
 			t.Fatalf("encoded hex mismatch, got: %s, want: %s", encodedHex, tc.encodedHex)
 		}
 
-		decoded, err := decode[GameLog](encoded)
+		decoded, err := decodeGob[GameLog](encoded)
 		if err != nil {
 			t.Fatalf("decode failed: %v", err)
 		}

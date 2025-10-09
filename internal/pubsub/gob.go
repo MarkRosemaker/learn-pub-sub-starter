@@ -14,6 +14,15 @@ func PublishGob[T any](ch *amqp.Channel, exchange, key string, val T) error {
 	)
 }
 
+func SubscribeGob[T any](conn *amqp.Connection,
+	exchange, queueName, key string, queueType SimpleQueueType, handler func(T) AckType,
+) error {
+	return subscribe(
+		func(data []byte) (T, error) { return decodeGob[T](data) },
+		conn, exchange, queueName, key, queueType, handler,
+	)
+}
+
 func encodeGob[T any](val T) ([]byte, error) {
 	w := &bytes.Buffer{}
 	if err := gob.NewEncoder(w).Encode(val); err != nil {
@@ -23,7 +32,7 @@ func encodeGob[T any](val T) ([]byte, error) {
 	return w.Bytes(), nil
 }
 
-func decode[T any](data []byte) (T, error) {
+func decodeGob[T any](data []byte) (T, error) {
 	var val T
 	if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&val); err != nil {
 		return val, err
