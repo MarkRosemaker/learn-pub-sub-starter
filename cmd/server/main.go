@@ -45,6 +45,16 @@ func do() error {
 		return fmt.Errorf("%s: %w", routing.GameLogSlug, err)
 	}
 
+	if err := pubsub.SubscribeGob[routing.GameLog](conn,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		util.DotJoin(routing.GameLogSlug, util.Asterisk),
+		pubsub.SimpleQueueTypeDurable,
+		handleLog,
+	); err != nil {
+		return fmt.Errorf("%s: %w", routing.GameLogSlug, err)
+	}
+
 	gamelogic.PrintServerHelp()
 
 	if err := gameLoop(publishCh); err != nil {
@@ -85,4 +95,10 @@ func gameLoop(ch *amqp.Channel) error {
 			log.Printf("unknown command %q", words[0])
 		}
 	}
+}
+
+func handleLog(gl routing.GameLog) pubsub.AckType {
+	defer fmt.Print("> ")
+	gamelogic.WriteLog(gl)
+	return pubsub.Ack
 }
