@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
+	"time"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
@@ -115,16 +117,41 @@ func gameLoop(ch *amqp.Channel, gs *gamelogic.GameState) error {
 			fmt.Printf("Moved %v units to %s\n", len(mv.Units), mv.ToLocation)
 		case "status":
 			gs.CommandStatus()
+		case "spam":
+			if len(words) < 2 {
+				fmt.Println("Usage: spam N")
+				continue
+			}
+
+			n, err := strconv.Atoi(words[1])
+			if err != nil {
+				fmt.Printf("Invalid number: %v\n", err)
+				continue
+			}
+
+			log.Printf("Spamming %d times...\n", n)
+			for range n {
+				if err := pubsub.PublishGob(ch,
+					routing.ExchangePerilTopic,
+					util.DotJoin(routing.GameLogSlug, gs.GetUsername()),
+					GameLog{
+						CurrentTime: time.Now(),
+						Message:     gamelogic.GetMaliciousLog(),
+						Username:    gs.GetUsername(),
+					},
+				); err != nil {
+					return fmt.Errorf("publishing spam: %w", err)
+				}
+			}
+
+		case "quit":
+			gamelogic.PrintQuit()
+			return nil
 		default:
 			fmt.Printf("Command %q unknown\n", words[0])
 			fallthrough
 		case "help":
 			gamelogic.PrintClientHelp()
-		case "spam":
-			fmt.Println("Spamming not allowed yet!")
-		case "quit":
-			gamelogic.PrintQuit()
-			return nil
 		}
 	}
 }
