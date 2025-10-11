@@ -56,18 +56,17 @@ func GetInput() []string {
 	return strings.Fields(strings.TrimSpace(scanner.Text()))
 }
 
+var possibleLogs = []string{
+	"Never interrupt your enemy when he is making a mistake.",
+	"The hardest thing of all for a soldier is to retreat.",
+	"A soldier will fight long and hard for a bit of colored ribbon.",
+	"It is well that war is so terrible, otherwise we should grow too fond of it.",
+	"The art of war is simple enough. Find out where your enemy is. Get at him as soon as you can. Strike him as hard as you can, and keep moving on.",
+	"All warfare is based on deception.",
+}
+
 func GetMaliciousLog() string {
-	possibleLogs := []string{
-		"Never interrupt your enemy when he is making a mistake.",
-		"The hardest thing of all for a soldier is to retreat.",
-		"A soldier will fight long and hard for a bit of colored ribbon.",
-		"It is well that war is so terrible, otherwise we should grow too fond of it.",
-		"The art of war is simple enough. Find out where your enemy is. Get at him as soon as you can. Strike him as hard as you can, and keep moving on.",
-		"All warfare is based on deception.",
-	}
-	randomIndex := rand.Intn(len(possibleLogs))
-	msg := possibleLogs[randomIndex]
-	return msg
+	return possibleLogs[rand.Intn(len(possibleLogs))]
 }
 
 func PrintQuit() {
