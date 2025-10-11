@@ -45,7 +45,7 @@ func do() error {
 		return fmt.Errorf("%s: %w", routing.GameLogSlug, err)
 	}
 
-	if err := pubsub.SubscribeGob[routing.GameLog](conn,
+	if err := pubsub.SubscribeGob(conn,
 		routing.ExchangePerilTopic,
 		routing.GameLogSlug,
 		util.DotJoin(routing.GameLogSlug, util.Asterisk),
