@@ -37,6 +37,10 @@ func subscribe[T any](
 		return err
 	}
 
+	if err := ch.Qos(10, 0, false); err != nil {
+		return fmt.Errorf("setting qos: %w", err)
+	}
+
 	deliveries, err := ch.Consume(q.Name, "", false, false, false, false, nil)
 	if err != nil {
 		return fmt.Errorf("consuming %q: %w", q.Name, err)
